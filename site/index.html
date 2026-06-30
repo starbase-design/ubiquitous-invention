@@ -163,6 +163,14 @@ main{max-width:var(--maxw); margin:0 auto; padding:var(--s6) var(--s3) 112px;}
 @media (max-width:700px){
   .well textarea{font-size:16px;} /* lock 16px: no iOS focus-zoom */
   .well:focus-within{box-shadow:0 0 0 2px var(--orange);} /* trim the blur on phones */
+  .topbar{padding:0 16px;} /* match the 16px column gutter; recover width at 320px */
+  .chip{max-width:42vw; overflow:hidden; text-overflow:ellipsis;}
+}
+@media (max-width:380px){
+  /* tightest phones: drop the save chip; status still lives in the progress line,
+     the counter and the #live region, so nothing essential is lost */
+  .chip{display:none;}
+  .topbar{gap:12px;}
 }
 .well textarea::placeholder{color:var(--ink-soft); opacity:.7;}
 
@@ -200,7 +208,7 @@ footer{margin-top:var(--s5);}
 .pill:focus-visible{outline:none; box-shadow:0 0 0 2px var(--canvas), 0 0 0 4px var(--orange);}
 .foot-lines{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s2); margin-top:var(--s3); flex-wrap:wrap;}
 .foot-lines .keep{font-size:14px; color:var(--ink-soft);}
-.foot-lines .whisper{font:400 12px/1 var(--geo); letter-spacing:.04em; color:var(--ink-soft); opacity:.8;}
+.foot-lines .whisper{font:400 12px/1 var(--geo); letter-spacing:.04em; color:var(--ink-soft);}
 
 /* the completion stamp - only when genuinely earned */
 .granted{
@@ -258,8 +266,8 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
     <section class="note" aria-label="A note">
       <div class="stub" aria-hidden="true"><span>N&ordm; 13 &middot; PVT &middot; DD</span></div>
       <div class="note-body">
-        <p>Don &ndash; no rush, and no right answers. Just <strong>13 quick things</strong> so I can build around how you actually work, not how it looks from outside. Rough is perfect &ndash; bullets, half-thoughts, voice-note energy, whatever's fastest. It saves itself to this device as you go; when you're done, download or copy and send it back.</p>
-        <p class="sign">&ndash; B</p>
+        <p>Don - no rush, and no right answers. Just <strong>13 quick things</strong> so I can build around how you actually work, not how it looks from outside. Rough is perfect - bullets, half-thoughts, voice-note energy, whatever's fastest. It saves itself to this device as you go; when you're done, download or copy and send it back.</p>
+        <p class="sign">- B</p>
       </div>
     </section>
 
@@ -279,7 +287,7 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
       </div>
       <div class="foot-lines">
         <span class="keep">Autosaves to this device. Yours to keep.</span>
-        <span class="whisper">Gold Coast &rarr; the world</span>
+        <span class="whisper">Gold Coast to the world</span>
       </div>
       <noscript><div class="ns">This page saves your answers in your browser, so it needs JavaScript switched on. If it isn't loading right, just reply to my message and I'll send the 13 questions as plain text.</div></noscript>
     </footer>
@@ -312,7 +320,7 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
     "Of your monthly listeners, how many are real followers, and how many are repeat vs one-time algorithmic passers-through?",
     "After a viral spike, what's in place to keep the new people - or do they evaporate before the next release?",
     "Do you have any direct line to fans - email, WhatsApp, Discord, broadcast - or is it all rented on Spotify and IG?",
-    "Where's the biggest gap between “this is working” and “this is monetized” - what's getting attention but no money?",
+    "Where's the biggest gap between \"this is working\" and \"this is monetized\" - what's getting attention but no money?",
     "If you could hand one piece of all this to someone and never think about it again, what would it be?"
   ];
   var POCKET = 6; // 0-based index of card 07
@@ -396,7 +404,7 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
   /* ---- state ------------------------------------------------------------ */
   var KEY = 'dali.passaporte.v1';
   var store = { answers:{}, savedAt:null };
-  try{ var raw = localStorage.getItem(KEY); if(raw){ store = JSON.parse(raw) || store; store.answers = store.answers || {}; } }catch(e){}
+  try{ var raw = localStorage.getItem(KEY); if(raw){ var parsed = JSON.parse(raw); if(parsed && typeof parsed === 'object'){ store = parsed; } store.answers = (store.answers && typeof store.answers === 'object') ? store.answers : {}; } }catch(e){}
 
   var cardsEl = document.getElementById('cards');
   var refs = [];
@@ -440,7 +448,7 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
     counter.innerHTML = pad2(n)+'&nbsp;/&nbsp;13';
     bar.style.width = (n/refs.length*100) + '%';
     document.body.classList.toggle('complete', n === refs.length);
-    live.textContent = n + ' of 13 answered';
+    live.textContent = (n === refs.length) ? 'All 13 answered - entry granted' : (n + ' of 13 answered');
   }
 
   function timeNow(){ var d=new Date(); return pad2(d.getHours())+':'+pad2(d.getMinutes()); }
@@ -454,6 +462,8 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
     try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){}
     chip.textContent = 'Saved ' + timeNow();
     paint();
+    var sn = answeredCount();
+    live.textContent = (sn === refs.length ? 'All 13 answered - entry granted' : sn + ' of 13 answered') + ' - saved ' + timeNow();
   }
   function onInput(e){
     autosize(e.target);
@@ -466,6 +476,11 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
     refs[j].ta.addEventListener('input', onInput);
     autosize(refs[j].ta);
   }
+
+  // commit any pending edit before the tab goes away (mobile close, navigation)
+  function flush(){ if(t){ clearTimeout(t); t=null; save(); } }
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) flush(); });
 
   // restore silently on load (no replay animation)
   var hadSave = !!store.savedAt;
@@ -495,8 +510,8 @@ noscript .ns{margin-top:var(--s3); padding:18px 20px; border:1px solid var(--hai
     return lines.join('\n');
   }
   function flash(btns, word){
-    btns.forEach(function(b){ if(!b) return; var o=b.textContent; b.dataset.o=o; b.textContent=word; });
-    setTimeout(function(){ btns.forEach(function(b){ if(b && b.dataset.o){ b.textContent=b.dataset.o; } }); }, 1200);
+    btns.forEach(function(b){ if(!b || b.dataset.flashing) return; b.dataset.flashing='1'; b.dataset.o=b.textContent; b.textContent=word; });
+    setTimeout(function(){ btns.forEach(function(b){ if(!b) return; if(b.dataset.o!==undefined){ b.textContent=b.dataset.o; delete b.dataset.o; } delete b.dataset.flashing; }); }, 1200);
   }
   function download(){
     var blob = new Blob([buildText()], {type:'text/plain;charset=utf-8'});
